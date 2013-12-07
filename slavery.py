@@ -23,6 +23,7 @@ class Player:
     self.score = 0
     self.active_card = None
     self.master = None
+    self.slaves = []
   def draw(self):
     if len(self.deck) == 0:
       return
@@ -36,15 +37,24 @@ class Player:
   def bow_out(self):
     self.capture(self)
   def enslave(self, other_player):
-    self.capture(other_player)
     other_player.master = self
+    self.slaves.append(other_player)
+    # steal slaves
+    for slave in other_player.slaves[:]:
+      slave.freedom()
+      self.enslave(slave)
+  def freedom(self):
+    self.master.slaves.remove(self)
+    self.master = None
   def __repr__(self):
     result = self.name + " [" + repr(self.big_points) + "," + repr(self.score) + "]"
     result += ": (" + repr(self.active_card) + ")"
     result += " " + " ".join(self.reveal_hand(x) for x in self.hand)
     result += " [" + " ".join(self.reveal_deck(x) for x in self.deck) + "]"
     if self.master != None:
-      result += " -> " + self.master.name
+      result += " :("
+    if len(self.slaves) > 0:
+      result += " :> " + ", ".join(slave.name for slave in self.slaves)
     return result
   def reveal_hand(self, card):
     if self.hide_hand: return "?"
@@ -82,7 +92,7 @@ def resolve():
     if slave.master == None: continue
     if compare(slave.active_card, slave.master.active_card) > 0:
       # break free
-      slave.master = None
+      slave.freedom()
     else:
       # sorry sucka
       slave.master.capture(slave)
@@ -109,6 +119,7 @@ def resolve():
     for noble in players_with(2):
       king.capture(noble)
     for peasant in players_with(0, 1):
+      king.capture(peasant)
       king.enslave(peasant)
     king.bow_out()
 
@@ -140,6 +151,8 @@ def all_random():
   for player in players:
     play_random(player)
   resolve()
+  all_draw()
+def all_draw():
   for player in players:
     player.draw()
 
@@ -152,7 +165,9 @@ def score_big():
       if you.master == me:
         me.big_points += 1
 
-players = [Player(chr(ord("A") + i)) for i in range(input("num_players?\n[4] >>> "))]
+try:    player_count = input("players?\n[4] >>> ")
+except: player_count = 4
+players = [Player(chr(ord("A") + i)) for i in range(player_count)]
 
 def simulation():
   for _ in range(10):
@@ -184,8 +199,7 @@ def interactive():
       what()
       raw_input("[] >>> ")
       resolve()
-      for player in players:
-        player.draw()
+      all_draw()
     what()
     raw_input("[] >>> ")
     score_big()
